@@ -27,7 +27,6 @@ func get(json []byte, fields ...string) (string, error) {
 
 	pos := 0
 	depth := 0
-	isValue := false
 	fieldFoundIndex := 0
 
 	// Initialize depth based on JSON start 0 or -1 based on whether it starts with {
@@ -52,78 +51,79 @@ func get(json []byte, fields ...string) (string, error) {
 			// 3) have different depth that the field we are looking for.
 			if depth == fieldFoundIndex &&
 				json[pos-1] != '\\' &&
-				pos+len(fields[fieldFoundIndex]) <= len(json)-1 && json[pos+len(fields[fieldFoundIndex])] == '"' {
-					// yeyy our "candidate_field" is in the right position and has the right depth
-					if bytes.Equal(json[pos+1:pos+len(fields[fieldFoundIndex])], []byte(fields[fieldFoundIndex])) {
-						// we found a match for the current field in the path
-						fieldFoundIndex++
-						if fieldFoundIndex == len(fields) {
-							// We found the full path, now extract the value
-							getNextToken(json, pos+len(fields[fieldFoundIndex-1])+1)
-							colonPos := findColon(json, pos+len(fields[fieldFoundIndex-1])+1)
+				pos+len(fields[fieldFoundIndex]) <= len(json)-1 &&
+				json[pos+len(fields[fieldFoundIndex])] == '"' {
+				// yeyy our "candidate_field" is in the right position and has the right depth
+				if bytes.Equal(json[pos+1:pos+len(fields[fieldFoundIndex])], []byte(fields[fieldFoundIndex])) {
+					// we found a match for the current field in the path
+					fieldFoundIndex++
+					if fieldFoundIndex == len(fields) {
+						// We found the full path, now extract the value
+						colonPos, err := nextColon(json, pos+len(fields[fieldFoundIndex]))
+						if err != nil {
+							return "", err
 						}
+						valuePos, err := nextToken(json, colonPos+1)
+						if err != nil {
+							return "", err
+						}
+
+						value, err := extractValue(json, valuePos)
+						if err != nil {
+							return "", err
+						}
+						return string(value), nil
 					}
 				}
 			}
+			pos++
 		case '{':
 			depth++
-			isValue = false
 			pos++
 		case '[':
 			// array
 			depth++
-			isValue = false
 			pos++
 		case '}':
 			depth--
-			isValue = false
 			pos++
 		case ',':
-			isValue = false
+			pos++
 		case ':':
-			isValue = true
+			pos++
 		}
 	}
+
 	return "", fmt.Errorf("field path not found: %v", fields)
 }
 
 // Helper functions
 
-func getNextToken(json []byte, pos int) (byte, int, error) {
+// return the first position of a non-whitespace character starting from pos
+func nextToken(json []byte, pos int) (int, error) {
 	for pos < len(json) {
 		if !isWhitespace(json[pos]) {
-			return json[pos], pos, nil
+			return pos, nil
 		}
 		pos++
 	}
-	return 0, -1, fmt.Errorf("no more tokens")
+	return -1, fmt.Errorf("no more tokens")
 }
 
 func isWhitespace(b byte) bool {
 	return b == ' ' || b == '\t' || b == '\n' || b == '\r'
 }
 
-// checked
-func findFieldEnd(json []byte, start int) int {
-	for i := start; i < len(json); i++ {
-		if json[i] == '"' {
-			return i
-		}
-	}
-	return -1
-}
+//return the position of the next colon starting from pos
 
-// checked
-func findColon(json []byte, start int) int {
-	for i := start; i < len(json); i++ {
-		if json[i] == ':' {
-			return i
+func nextColon(json []byte, pos int) (int, error) {
+	for pos < len(json) {
+		if json[pos] == ':' {
+			return pos, nil
 		}
-		if !isWhitespace(json[i]) {
-			return -1 // Found non-whitespace before colon
-		}
+		pos++
 	}
-	return -1
+	return -1, fmt.Errorf("no colon found")
 }
 
 func extractValue(json []byte, start int) ([]byte, error) {
@@ -146,7 +146,7 @@ func extractValue(json []byte, start int) ([]byte, error) {
 		return extractString(json, pos)
 	case '{':
 		// Object value
-		return extractObject(json, pos)
+		return extractObject(json, pos, 1)
 	case '[':
 		// Array value
 		return extractArray(json, pos)
@@ -242,7 +242,7 @@ func extractNull(json []byte, start int) ([]byte, error) {
 	return nil, fmt.Errorf("invalid null")
 }
 
-func parseObject(json []byte, pos int, depth int) ([]byte, error) {
+func extractObject(json []byte, pos int, depth int) ([]byte, error) {
 	inString := false
 	escaped := false
 
