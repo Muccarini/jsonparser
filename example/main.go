@@ -2,11 +2,12 @@ package main
 
 import (
 	"fmt"
+
 	"github.com/muccarini/jsonparser"
 )
 
 func main() {
-	json := `{
+	json := []byte(`{
 		"user": {
 			"id": 12345,
 			"name": "John Doe",
@@ -32,25 +33,14 @@ func main() {
 		"unicodeString": "Hello 世界 🌍",
 		"escapedChars": "Quote: \"Hi\", Tab:\t, Newline:\n, Backslash: \\",
 		"specialChars": "Forward slash: /"
-	}`
+	}`)
 
-	// Test various field extractions
-	tests := [][]string{
-		{"user", "name"},
-		{"user", "id"},
-		{"user", "location", "city"},
-		{"booleanTrue"},
-		{"nullValue"},
-		{"floatingPoint"},
-		{"unicodeString"},
+	res, err := jsonparser.Get[string](json, "user", "name")
+
+	if err != nil {
+		fmt.Printf("Error: %v", err)
+		return
 	}
 
-	for _, test := range tests {
-		result, err := jsonparser.Get([]byte(json), test...)
-		if err != nil {
-			fmt.Printf("Error getting %v: %v\n", test, err)
-		} else {
-			fmt.Printf("Get(%v) = %s\n", test, result)
-		}
-	}
+	fmt.Printf("RESPONSE: %v", res)
 }

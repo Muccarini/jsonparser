@@ -4,30 +4,111 @@ package jsonparser
 import (
 	"bytes"
 	"fmt"
+	"strconv"
+	//"log"
 )
+
+var (
+	ERROR_INVALID_JSON         = fmt.Errorf("invalid JSON")
+	ERROR_FIELD_NOT_FOUND      = fmt.Errorf("field not found")
+	ERROR_ARGUMENTS            = fmt.Errorf("invalid arguments")
+	ERROR_INVALID_INTEGER      = fmt.Errorf("invalid integer")
+	ERROR_INVALID_FLOAT        = fmt.Errorf("invalid float")
+	ERROR_INVALID_BOOLEAN      = fmt.Errorf("invalid boolean")
+	ERROR_INVALID_STRING       = fmt.Errorf("invalid string")
+	ERROR_INVALID_NULL         = fmt.Errorf("invalid null")
+	ERROR_COLON_NOT_FOUND      = fmt.Errorf("no colon found")
+	ERROR_NEXT_TOKEN_NOT_FOUND = fmt.Errorf("no more tokens found")
+)
+
+type irange struct {
+	start int
+	end   int
+}
 
 // API
 
-func Get(json []byte, fields ...string) (string, error) {
-	return get(json, fields...)
+func GetString(json []byte, fields ...string) (string, error) {
+	res, err := get(json, fields...)
+	if err != nil {
+		return "", err
+	}
+	return string(res), err
 }
 
-//FUNC
+func GetBool(json []byte, fields ...string) (bool, error) {
+	res, err := get(json, fields...)
+	if err != nil {
+		return false, err
+	}
 
-func get(json []byte, fields ...string) (string, error) {
+	boolValue, err := strconv.ParseBool(string(res))
+	if err != nil {
+		return false, err
+	}
 
+	return boolValue, nil
+}
+
+func GetInt(json []byte, fields ...string) (int, error) {
+	res, err := get(json, fields...)
+	if err != nil {
+		return -1, err
+	}
+
+	resInt, err := strconv.Atoi(string(res))
+	if err != nil {
+		return -1, err
+	}
+
+	return resInt, nil
+}
+
+func GetFloat(json []byte, bitSize int, fields ...string) (float64, error) {
+	res, err := get(json, fields...)
+	if err != nil {
+		return -1, err
+	}
+
+	resFloat, err := strconv.ParseFloat(string(res), bitSize)
+	if err != nil {
+		return -1, err
+	}
+
+	return resFloat, nil
+}
+
+// func Get[T any](json []byte, fields ...string) (*T, error) {
+// 	res, err := get(json, fields...)
+// 	if err != nil {
+// 		fmt.Errorf("Error: ", err)
+// 	}
+
+// 	toType, err := extractValue[T](res, 0, 0)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	return &toType, nil
+// }
+
+// INTERNAL
+
+func get(json []byte, fields ...string) ([]byte, error) {
 	// Simple validations
 	if len(json) == 0 {
-		return "", fmt.Errorf("json is empty")
+		return nil, ERROR_INVALID_JSON
 	}
 
 	if len(fields) == 0 {
-		return "", fmt.Errorf("no fields specified")
+		return nil, ERROR_ARGUMENTS
 	}
 
 	pos := 0
 	depth := 0
 	fieldFoundIndex := 0
+	isValue := false
+	isArrayValue := false
 
 	// Initialize depth based on JSON start 0 or -1 based on whether it starts with {
 	for pos < len(json) && isWhitespace(json[pos]) {
@@ -45,69 +126,123 @@ func get(json []byte, fields ...string) (string, error) {
 
 		switch json[pos] {
 		case '"':
-			// "candidate_field" must not:
-			// 1) be \"escaped\"
-			// 2) be longer/shorter than the field we are looking for.
-			// 3) have different depth that the field we are looking for.
+			candidate := irange{start: pos + 1, end: pos + 1 + len(fields[fieldFoundIndex])}
+
 			if depth == fieldFoundIndex &&
 				json[pos-1] != '\\' &&
-				pos+len(fields[fieldFoundIndex]) <= len(json)-1 &&
-				json[pos+len(fields[fieldFoundIndex])] == '"' {
-				// yeyy our "candidate_field" is in the right position and has the right depth
-				if bytes.Equal(json[pos+1:pos+len(fields[fieldFoundIndex])], []byte(fields[fieldFoundIndex])) {
-					// we found a match for the current field in the path
+				!isValue &&
+				candidate.end+1 <= len(json) &&
+				json[candidate.end] == '"' {
+
+				if bytes.Equal(json[candidate.start:candidate.end], []byte(fields[fieldFoundIndex])) {
 					fieldFoundIndex++
 					if fieldFoundIndex == len(fields) {
 						// We found the full path, now extract the value
-						colonPos, err := nextColon(json, pos+len(fields[fieldFoundIndex]))
+						colonPos, err := nextColon(json, candidate.end+1)
 						if err != nil {
-							return "", err
-						}
-						valuePos, err := nextToken(json, colonPos+1)
-						if err != nil {
-							return "", err
+							return nil, err
 						}
 
-						value, err := extractValue(json, valuePos)
+						// skip whitespace
+						valuePos, err := nextToken(json, colonPos)
 						if err != nil {
-							return "", err
+							return nil, err
 						}
-						return string(value), nil
+
+						switch json[valuePos] {
+						case 't', 'f':
+							slice, err := extractBoolean(json, valuePos)
+							if err != nil {
+								return nil, err
+							}
+							return slice, nil
+
+						case 'n':
+							slice, err := extractNull(json, valuePos)
+							if err != nil {
+								return nil, err
+							}
+							return slice, nil
+
+						case '{':
+							slice, err := extractObject(json, valuePos, depth+1)
+							if err != nil {
+								return nil, err
+							}
+							return slice, nil
+
+						case '[':
+							slice, err := extractArray(json, valuePos)
+							if err != nil {
+								return nil, err
+							}
+							return slice, nil
+
+						case '"':
+							slice, err := extractString(json, valuePos)
+							if err != nil {
+								return nil, err
+							}
+							return slice, nil
+
+						default:
+							slice, err := extractNumber(json, valuePos)
+							if err != nil {
+								return nil, err
+							}
+							return slice, nil
+						}
 					}
 				}
 			}
 			pos++
 		case '{':
-			depth++
-			pos++
-		case '[':
-			// array
-			depth++
+			if json[pos-1] != '\\' {
+				isValue = false
+				depth++
+			}
 			pos++
 		case '}':
-			depth--
+			if json[pos-1] != '\\' {
+				isValue = false
+				depth--
+			}
 			pos++
-		case ',':
+		case '[':
+			if json[pos-1] != '\\' {
+				isArrayValue = true
+				isValue = false
+			}
+			pos++
+		case ']':
+			if json[pos-1] != '\\' {
+				isArrayValue = false
+				isValue = false
+			}
 			pos++
 		case ':':
+			isValue = true
+			pos++
+		case ',':
+			isValue = isArrayValue
+			pos++
+		default:
 			pos++
 		}
 	}
 
-	return "", fmt.Errorf("field path not found: %v", fields)
+	return nil, ERROR_FIELD_NOT_FOUND
 }
 
-// Helper functions
-
-// return the first position of a non-whitespace character starting from pos
+// return the first position of a non-whitespace character starting from pos + 1
 func nextToken(json []byte, pos int) (int, error) {
 	for pos < len(json) {
+		pos++
 		if !isWhitespace(json[pos]) {
 			return pos, nil
 		}
-		pos++
 	}
-	return -1, fmt.Errorf("no more tokens")
+	return -1, ERROR_INVALID_JSON
 }
 
 func isWhitespace(b byte) bool {
@@ -126,111 +261,53 @@ func nextColon(json []byte, pos int) (int, error) {
 	return -1, fmt.Errorf("no colon found")
 }
 
-func extractValue(json []byte, start int) ([]byte, error) {
-	// Skip whitespace
-	pos := start
-	for pos < len(json) && isWhitespace(json[pos]) {
+// checked
+func extractString(json []byte, pos int) ([]byte, error) {
+	// Skip opening quote
+	var start int
+	if json[pos] == '"' {
+		start = pos
+		pos++
+	} else {
+		start = pos
+	}
+
+	// Find closing quote
+	for pos < len(json) {
+		if json[pos] == '"' {
+			if json[pos-1] != '\\' {
+				// Returning the value without the quotes.
+				return json[start+1 : pos], nil
+			}
+		}
 		pos++
 	}
 
-	if pos >= len(json) {
-		return nil, fmt.Errorf("no value found")
-	}
-
-	char := json[pos]
-
-	// Handle different value types
-	switch char {
-	case '"':
-		// String value
-		return extractString(json, pos)
-	case '{':
-		// Object value
-		return extractObject(json, pos, 1)
-	case '[':
-		// Array value
-		return extractArray(json, pos)
-	case 't', 'f':
-		// Boolean value
-		return extractBoolean(json, pos)
-	case 'n':
-		// Null value
-		return extractNull(json, pos)
-	default:
-		// Number value
-		if (char >= '0' && char <= '9') || char == '-' {
-			return extractNumber(json, pos)
-		}
-	}
-
-	return nil, fmt.Errorf("invalid value at position %d", pos)
+	return nil, ERROR_INVALID_JSON
 }
 
-func extractString(json []byte, start int) ([]byte, error) {
-	pos := start + 1 // Skip opening quote
-	escaped := false
+func extractNumber(json []byte, pos int) ([]byte, error) {
+	start := pos
 
 	for pos < len(json) {
-		if escaped {
-			escaped = false
-		} else if json[pos] == '\\' {
-			escaped = true
-		} else if json[pos] == '"' {
-			// Found closing quote, return the correct slice
-			return json[start : pos+1], nil
+		switch json[pos] {
+		case '-', '+', '.', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'e', 'E':
+			pos++
+			continue
+		default:
+			return json[start-1 : pos], nil
 		}
-		pos++
 	}
 
-	return nil, fmt.Errorf("unterminated string")
+	return nil, ERROR_INVALID_JSON
 }
 
-func extractNumber(json []byte, start int) ([]byte, error) {
-	pos := start
-
-	// Skip optional minus
-	if pos < len(json) && json[pos] == '-' {
-		pos++
+func extractBoolean(json []byte, pos int) ([]byte, error) {
+	if pos+4 <= len(json) && bytes.Equal(json[pos:pos+4], []byte("true")) {
+		return json[pos : pos+4], nil
 	}
-
-	// Must have at least one digit
-	if pos >= len(json) || (json[pos] < '0' || json[pos] > '9') {
-		return nil, fmt.Errorf("invalid number")
-	}
-
-	// Skip digits
-	for pos < len(json) && json[pos] >= '0' && json[pos] <= '9' {
-		pos++
-	}
-
-	// Optional decimal part
-	if pos < len(json) && json[pos] == '.' {
-		pos++
-		for pos < len(json) && json[pos] >= '0' && json[pos] <= '9' {
-			pos++
-		}
-	}
-
-	// Optional exponent
-	if pos < len(json) && (json[pos] == 'e' || json[pos] == 'E') {
-		pos++
-		if pos < len(json) && (json[pos] == '+' || json[pos] == '-') {
-			pos++
-		}
-		for pos < len(json) && json[pos] >= '0' && json[pos] <= '9' {
-			pos++
-		}
-	}
-
-	return json[start:pos], nil
-}
-
-func extractBoolean(json []byte, start int) ([]byte, error) {
-	if start+4 <= len(json) && bytes.Equal(json[start:start+4], []byte("true")) {
-		return json[start : start+4], nil
-	}
-	if start+5 <= len(json) && bytes.Equal(json[start:start+5], []byte("false")) {
-		return json[start : start+5], nil
+	if pos+5 <= len(json) && bytes.Equal(json[pos:pos+5], []byte("false")) {
+		return json[pos : pos+5], nil
 	}
 	return nil, fmt.Errorf("invalid boolean")
 }
@@ -239,67 +316,98 @@ func extractNull(json []byte, start int) ([]byte, error) {
 	if start+4 <= len(json) && bytes.Equal(json[start:start+4], []byte("null")) {
 		return json[start : start+4], nil
 	}
-	return nil, fmt.Errorf("invalid null")
+	return nil, ERROR_INVALID_NULL
 }
 
 func extractObject(json []byte, pos int, depth int) ([]byte, error) {
-	inString := false
+	isValue := false
 	escaped := false
+	isArray := false
+
+	switch json[pos] {
+	case '{':
+		if json[pos-1] != '\\' && !isValue {
+			// Start of an object
+			depth++
+		}
+	case '}':
+		if json[pos-1] != '\\' && !isValue {
+			depth--
+		}
+		pos++
+	case '[':
+		if json[pos-1] != '\\' && !isValue {
+			isArray = true
+		}
+		pos++
+	case ']':
+		if json[pos-1] != '\\' && !isValue {
+			isArray = false
+		}
+		pos++
+	case ':':
+		if json[pos-1] != '\\' {
+			isValue = true
+		}
+		pos++
+	case ',':
+		isValue = isArray
+		pos++
+	}
 
 	for pos < len(json) {
-		char := json[pos]
 
-		if inString {
+		if isValue {
 			if escaped {
 				escaped = false
-			} else if char == '\\' {
+			} else if json[pos] == '\\' {
 				escaped = true
-			} else if char == '"' {
-				inString = false
+			} else if json[pos] == '"' {
+				isValue = false
 			}
 		} else {
-			if char == '"' {
-				inString = true
-			} else if char == '{' {
+			if json[pos] == '"' {
+				isValue = true
+			} else if json[pos] == '{' {
 				depth++
-			} else if char == '}' {
+			} else if json[pos] == '}' {
 				depth--
 				if depth == 0 {
-					return json[start : pos+1], nil
+					return json[pos : pos+1], nil
 				}
 			}
 		}
 		pos++
 	}
 
-	return nil, fmt.Errorf("unterminated object")
+	return nil, ERROR_INVALID_JSON
 }
 
 func extractArray(json []byte, start int) ([]byte, error) {
-	depth := 0
+	count := 0
 	pos := start
-	inString := false
+	isValue := false
 	escaped := false
 
 	for pos < len(json) {
 		char := json[pos]
 
-		if inString {
+		if isValue {
 			if escaped {
 				escaped = false
 			} else if char == '\\' {
 				escaped = true
 			} else if char == '"' {
-				inString = false
+				isValue = false
 			}
 		} else {
 			if char == '"' {
-				inString = true
+				isValue = true
 			} else if char == '[' {
-				depth++
+				count++
 			} else if char == ']' {
-				depth--
-				if depth == 0 {
+				count--
+				if count == 0 {
 					return json[start : pos+1], nil
 				}
 			}
