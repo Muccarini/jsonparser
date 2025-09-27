@@ -1,11 +1,9 @@
 package jsonparser
 
-// IMPORT
 import (
 	"bytes"
 	"fmt"
 	"strconv"
-	//"log"
 )
 
 var (
@@ -33,7 +31,8 @@ func GetString(json []byte, fields ...string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return string(res), err
+
+	return string(res), nil
 }
 
 func GetBool(json []byte, fields ...string) (bool, error) {
@@ -42,12 +41,14 @@ func GetBool(json []byte, fields ...string) (bool, error) {
 		return false, err
 	}
 
-	boolValue, err := strconv.ParseBool(string(res))
-	if err != nil {
-		return false, err
+	switch string(res) {
+	case "true":
+		return true, nil
+	case "false":
+		return false, nil
 	}
 
-	return boolValue, nil
+	return false, ERROR_INVALID_BOOLEAN
 }
 
 func GetInt(json []byte, fields ...string) (int, error) {
@@ -64,7 +65,21 @@ func GetInt(json []byte, fields ...string) (int, error) {
 	return resInt, nil
 }
 
-func GetFloat(json []byte, bitSize int, fields ...string) (float64, error) {
+func GetInt64(json []byte, fields ...string) (int64, error) {
+	res, err := get(json, fields...)
+	if err != nil {
+		return -1, err
+	}
+
+	resInt64, err := strconv.ParseInt(string(res), 10, 64)
+	if err != nil {
+		return -1, err
+	}
+
+	return resInt64, nil
+}
+
+func GetFloat64(json []byte, bitSize int, fields ...string) (float64, error) {
 	res, err := get(json, fields...)
 	if err != nil {
 		return -1, err
@@ -77,20 +92,6 @@ func GetFloat(json []byte, bitSize int, fields ...string) (float64, error) {
 
 	return resFloat, nil
 }
-
-// func Get[T any](json []byte, fields ...string) (*T, error) {
-// 	res, err := get(json, fields...)
-// 	if err != nil {
-// 		fmt.Errorf("Error: ", err)
-// 	}
-
-// 	toType, err := extractValue[T](res, 0, 0)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	return &toType, nil
-// }
 
 // INTERNAL
 
@@ -249,8 +250,7 @@ func isWhitespace(b byte) bool {
 	return b == ' ' || b == '\t' || b == '\n' || b == '\r'
 }
 
-//return the position of the next colon starting from pos
-
+// return the position of the next colon starting from pos
 func nextColon(json []byte, pos int) (int, error) {
 	for pos < len(json) {
 		if json[pos] == ':' {
@@ -295,7 +295,7 @@ func extractNumber(json []byte, pos int) ([]byte, error) {
 			pos++
 			continue
 		default:
-			return json[start-1 : pos], nil
+			return json[start:pos], nil
 		}
 	}
 
