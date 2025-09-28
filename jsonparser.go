@@ -144,55 +144,12 @@ func get(json []byte, fields ...string) ([]byte, error) {
 							return nil, err
 						}
 
-						// skip whitespace
-						valuePos, err := nextToken(json, colonPos)
+						slice, err := extractValue(json, colonPos+1, depth)
 						if err != nil {
 							return nil, err
 						}
 
-						switch json[valuePos] {
-						case 't', 'f':
-							slice, err := extractBoolean(json, valuePos)
-							if err != nil {
-								return nil, err
-							}
-							return slice, nil
-
-						case 'n':
-							slice, err := extractNull(json, valuePos)
-							if err != nil {
-								return nil, err
-							}
-							return slice, nil
-
-						case '{':
-							slice, err := extractObject(json, valuePos, depth+1)
-							if err != nil {
-								return nil, err
-							}
-							return slice, nil
-
-						case '[':
-							slice, err := extractArray(json, valuePos)
-							if err != nil {
-								return nil, err
-							}
-							return slice, nil
-
-						case '"':
-							slice, err := extractString(json, valuePos)
-							if err != nil {
-								return nil, err
-							}
-							return slice, nil
-
-						default:
-							slice, err := extractNumber(json, valuePos)
-							if err != nil {
-								return nil, err
-							}
-							return slice, nil
-						}
+						return slice, nil
 					}
 				}
 			}
@@ -235,6 +192,56 @@ func get(json []byte, fields ...string) ([]byte, error) {
 	return nil, ERROR_FIELD_NOT_FOUND
 }
 
+func extractValue(json []byte, pos int, depth int) ([]byte, error) {
+	for pos < len(json) && isWhitespace(json[pos]) {
+		pos++
+	}
+
+	switch json[pos] {
+	case 't', 'f':
+		slice, err := extractBoolean(json, pos)
+		if err != nil {
+			return nil, err
+		}
+		return slice, nil
+
+	case 'n':
+		slice, err := extractNull(json, pos)
+		if err != nil {
+			return nil, err
+		}
+		return slice, nil
+
+	case '{':
+		slice, err := extractObject(json, pos, depth+1)
+		if err != nil {
+			return nil, err
+		}
+		return slice, nil
+
+	case '[':
+		slice, err := extractArray(json, pos)
+		if err != nil {
+			return nil, err
+		}
+		return slice, nil
+
+	case '"':
+		slice, err := extractString(json, pos)
+		if err != nil {
+			return nil, err
+		}
+		return slice, nil
+
+	default:
+		slice, err := extractNumber(json, pos)
+		if err != nil {
+			return nil, err
+		}
+		return slice, nil
+	}
+}
+
 // return the first position of a non-whitespace character starting from pos + 1
 func nextToken(json []byte, pos int) (int, error) {
 	for pos < len(json) {
@@ -259,6 +266,127 @@ func nextColon(json []byte, pos int) (int, error) {
 		pos++
 	}
 	return -1, fmt.Errorf("no colon found")
+}
+
+func findArrayElementPos(json []byte, pos int, field int, depth int) (int, error) {
+	for pos < len(json) && isWhitespace(json[pos]) {
+		pos++
+	}
+
+	isValue := false
+	index := 0
+	arrayDepth := depth
+
+	for pos < len(json) {
+		switch json[pos] {
+		case ',':
+			if !isValue && arrayDepth == depth {
+				index++
+				if field == index {
+					for pos < len(json) && isWhitespace(json[pos]) {
+						pos++
+					}
+				}
+			}
+			return pos, nil
+		case '"':
+			if json[pos-1] != '\\' {
+				isValue = !isValue
+			}
+			pos++
+		case '{':
+			if json[pos-1] != '\\' {
+				depth++
+			}
+			pos++
+		case '}':
+			if json[pos-1] != '\\' {
+				depth--
+			}
+			pos++
+		case '[':
+			if json[pos-1] != '\\' {
+				depth++
+			}
+			pos++
+		case ']':
+			if json[pos-1] != '\\' {
+				depth--
+			}
+			pos++
+		case ':':
+			pos++
+		default:
+			pos++
+		}
+	}
+
+	return -1, ERROR_FIELD_NOT_FOUND
+}
+
+func findFieldSlice(json []byte, pos int, field string, fieldIndex int, depth int) ([]byte, error) {
+	if len(json) == 0 {
+		return nil, ERROR_INVALID_JSON
+	}
+
+	for pos < len(json) && isWhitespace(json[pos]) {
+		pos++
+	}
+
+	isValue := false
+	isArrayValue := false
+
+	for pos < len(json) {
+		switch json[pos] {
+		case '"':
+			candidate := irange{start: pos + 1, end: pos + 1 + len(field)}
+			if depth == fieldIndex &&
+				json[pos-1] != '\\' &&
+				!isValue &&
+				candidate.end+1 <= len(json) &&
+				json[candidate.end] == '"' {
+
+				if bytes.Equal(json[candidate.start:candidate.end], []byte(field)) {
+					return json[candidate.start:candidate.end], nil
+				}
+			}
+			pos++
+		case '{':
+			if json[pos-1] != '\\' {
+				isValue = false
+				depth++
+			}
+			pos++
+		case '}':
+			if json[pos-1] != '\\' {
+				isValue = false
+				depth--
+			}
+			pos++
+		case '[':
+			if json[pos-1] != '\\' {
+				isArrayValue = true
+				isValue = false
+			}
+			pos++
+		case ']':
+			if json[pos-1] != '\\' {
+				isArrayValue = false
+				isValue = false
+			}
+			pos++
+		case ':':
+			isValue = true
+			pos++
+		case ',':
+			isValue = isArrayValue
+			pos++
+		default:
+			pos++
+		}
+	}
+
+	return nil, ERROR_FIELD_NOT_FOUND
 }
 
 // checked

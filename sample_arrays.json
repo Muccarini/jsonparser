@@ -1,0 +1,99 @@
+{
+  "empty_array": [],
+  "string_array": ["apple", "banana", "cherry", "date"],
+  "number_array": [1, 2, 3, 4, 5, 42, 100],
+  "float_array": [1.1, 2.5, 3.14, 4.0, 5.999],
+  "boolean_array": [true, false, true, true, false],
+  "mixed_array": [1, "hello", true, 3.14, null, false, "world"],
+  "null_array": [null, null, null],
+  "nested_arrays": [
+    [1, 2, 3],
+    ["a", "b", "c"],
+    [true, false],
+    [[1, 2], [3, 4]]
+  ],
+  "array_of_objects": [
+    {
+      "id": 1,
+      "name": "John Doe",
+      "email": "john@example.com",
+      "active": true
+    },
+    {
+      "id": 2,
+      "name": "Jane Smith",
+      "email": "jane@example.com",
+      "active": false
+    },
+    {
+      "id": 3,
+      "name": "Bob Johnson",
+      "email": "bob@example.com",
+      "active": true
+    }
+  ],
+  "objects_with_arrays": [
+    {
+      "name": "Product A",
+      "tags": ["electronics", "mobile", "smartphone"],
+      "prices": [299.99, 399.99, 499.99],
+      "features": {
+        "colors": ["black", "white", "red"],
+        "storage": [64, 128, 256]
+      }
+    },
+    {
+      "name": "Product B",
+      "tags": ["book", "fiction", "bestseller"],
+      "prices": [9.99, 14.99],
+      "features": {
+        "genres": ["mystery", "thriller"],
+        "pages": [250, 300, 350]
+      }
+    }
+  ],
+  "deeply_nested": [
+    {
+      "level1": [
+        {
+          "level2": [
+            {
+              "level3": [
+                {"data": "deep value 1"},
+                {"data": "deep value 2"}
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "large_array": [
+    "item_1", "item_2", "item_3", "item_4", "item_5",
+    "item_6", "item_7", "item_8", "item_9", "item_10",
+    "item_11", "item_12", "item_13", "item_14", "item_15",
+    "item_16", "item_17", "item_18", "item_19", "item_20"
+  ],
+  "unicode_array": ["café", "naïve", "résumé", "🌟", "🚀", "💡"],
+  "special_characters": ["line\nbreak", "tab\there", "quote\"test", "backslash\\test"],
+  "single_element_arrays": {
+    "one_string": ["single"],
+    "one_number": [42],
+    "one_boolean": [true],
+    "one_null": [null],
+    "one_object": [{"key": "value"}],
+    "one_array": [[1, 2, 3]]
+  },
+  "arrays_with_duplicates": {
+    "duplicate_strings": ["apple", "banana", "apple", "cherry", "banana"],
+    "duplicate_numbers": [1, 2, 3, 1, 2, 4, 5, 3],
+    "duplicate_booleans": [true, false, true, true, false, false]
+  },
+  "edge_cases": {
+    "array_with_empty_strings": ["", "hello", "", "world", ""],
+    "array_with_zeros": [0, 1, 0, 2, 0, 3],
+    "array_with_negative_numbers": [-1, -2, -3, 0, 1, 2, 3],
+    "array_with_very_long_string": ["This is a very long string that might test the parser's ability to handle larger text content within array elements"],
+    "array_with_scientific_notation": [1e10, 2.5e-3, -1.23e+5, 0e0]
+  }
+}
