@@ -1,0 +1,81 @@
+{
+	"stringValue": "Hello, World!",
+	"longString": "This is a very long string designed to test performance with substantial text content that might be encountered in real-world applications",
+	"emptyString": "",
+	"unicodeString": "Hello 世界 🌍 Testing unicode characters",
+	"stringWithEscapes": "Line 1\nLine 2\tTab\r\nCarriage return and quotes: \"Hello\"",
+	
+	"boolTrue": true,
+	"boolFalse": false,
+	
+	"intZero": 0,
+	"intPositive": 42,
+	"intNegative": -123,
+	"intLarge": 2147483647,
+	"intMinimum": -2147483648,
+	
+	"int64Large": 9223372036854775807,
+	"int64Minimum": -9223372036854775808,
+	
+	"floatZero": 0.0,
+	"floatPositive": 3.14159,
+	"floatNegative": -2.71828,
+	"floatScientific": 1.23e-4,
+	"floatLarge": 1.7976931348623157e+308,
+	"floatSmall": 2.2250738585072014e-308,
+	
+	"nullValue": null,
+	
+	"nested": {
+		"deepString": "Nested string value",
+		"deepBool": true,
+		"deepInt": 999,
+		"deepFloat": 123.456,
+		"level2": {
+			"veryDeepString": "Very deep string",
+			"veryDeepBool": false,
+			"veryDeepInt": 777,
+			"veryDeepFloat": 987.654,
+			"level3": {
+				"extremelyDeepString": "Extremely deep string for performance testing",
+				"extremelyDeepBool": true,
+				"extremelyDeepInt": 555,
+				"extremelyDeepFloat": 111.222
+			}
+		}
+	},
+	
+	"arrayOfStrings": ["first", "second", "third", "fourth", "fifth"],
+	"arrayOfBools": [true, false, true, false, true],
+	"arrayOfInts": [1, 2, 3, 4, 5, 10, 20, 30],
+	"arrayOfFloats": [1.1, 2.2, 3.3, 4.4, 5.5],
+	
+	"mixedArray": [
+		"string item",
+		42,
+		true,
+		3.14,
+		null,
+		{
+			"arrayItemString": "nested object string",
+			"arrayItemBool": false,
+			"arrayItemInt": 100,
+			"arrayItemFloat": 99.99
+		}
+	],
+	
+	"performance": {
+		"manyFields": {
+			"field1": "value1", "field2": "value2", "field3": "value3", "field4": "value4", "field5": "value5",
+			"field6": "value6", "field7": "value7", "field8": "value8", "field9": "value9", "field10": "value10",
+			"field11": "value11", "field12": "value12", "field13": "value13", "field14": "value14", "field15": "value15",
+			"field16": "value16", "field17": "value17", "field18": "value18", "field19": "value19", "field20": "value20"
+		},
+		"repetitiveData": {
+			"string": "repeated string for testing performance impact of similar data",
+			"int": 12345,
+			"float": 123.45,
+			"bool": true
+		}
+	}
+}
