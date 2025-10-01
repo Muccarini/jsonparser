@@ -82,7 +82,7 @@ func TestFloatArrayElements(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		result, err := jsonparser.GetFloat64(arrayTestJson, 64, "float_array", test.index)
+		result, err := jsonparser.GetFloat64(arrayTestJson, "float_array", test.index)
 		assert.NoError(t, err, "Error getting float_array[%s]", test.index)
 		assert.Equal(t, test.expected, result, "float_array[%s] should equal %f", test.index, test.expected)
 	}
@@ -126,7 +126,7 @@ func TestMixedArrayElements(t *testing.T) {
 	assert.Equal(t, true, boolResult, "mixed_array[2] should equal true")
 
 	// Test float element
-	floatResult, err := jsonparser.GetFloat64(arrayTestJson, 64, "mixed_array", "3")
+	floatResult, err := jsonparser.GetFloat64(arrayTestJson, "mixed_array", "3")
 	assert.NoError(t, err, "Error getting mixed_array[3]")
 	assert.Equal(t, 3.14, floatResult, "mixed_array[3] should equal 3.14")
 
@@ -205,7 +205,7 @@ func TestObjectsWithArrays(t *testing.T) {
 	assert.Equal(t, "mobile", tag, "objects_with_arrays[0].tags[1] should equal mobile")
 
 	// Test Product A prices
-	price, err := jsonparser.GetFloat64(arrayTestJson, 64, "objects_with_arrays", "0", "prices", "0")
+	price, err := jsonparser.GetFloat64(arrayTestJson, "objects_with_arrays", "0", "prices", "0")
 	assert.NoError(t, err, "Error getting objects_with_arrays[0].prices[0]")
 	assert.Equal(t, 299.99, price, "objects_with_arrays[0].prices[0] should equal 299.99")
 
@@ -362,7 +362,7 @@ func TestEdgeCases(t *testing.T) {
 	assert.Equal(t, expectedStart, longString[:len(expectedStart)], "long string should start with expected text")
 
 	// Test scientific notation
-	scientific, err := jsonparser.GetFloat64(arrayTestJson, 64, "edge_cases", "array_with_scientific_notation", "0")
+	scientific, err := jsonparser.GetFloat64(arrayTestJson, "edge_cases", "array_with_scientific_notation", "0")
 	assert.NoError(t, err, "Error getting scientific notation")
 	assert.Equal(t, 1e10, scientific, "scientific notation should equal 1e10")
 }
@@ -397,5 +397,227 @@ func BenchmarkArrayOfObjectsAccess(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_, err := jsonparser.GetString(arrayTestJson, "array_of_objects", "0", "name")
 		assert.NoError(b, err)
+	}
+}
+
+// ===== Tests for ForeachArrayElement =====
+func TestForeachArrayElement_StringArray(t *testing.T) {
+	expected := []string{"apple", "banana", "cherry", "date"}
+	results := []string{}
+
+	err := jsonparser.ForeachArrayElement(arrayTestJson, func(valueSlice []byte, index int) {
+		results = append(results, string(valueSlice))
+	}, "string_array")
+
+	assert.NoError(t, err)
+	assert.Equal(t, len(expected), len(results), "Should have correct number of elements")
+	for i, exp := range expected {
+		assert.Equal(t, exp, results[i], "Element at index %d should match", i)
+	}
+}
+
+// Test ForeachArrayElement with number array
+func TestForeachArrayElement_NumberArray(t *testing.T) {
+	expected := []string{"1", "2", "3", "4", "5", "42", "100"}
+	results := []string{}
+
+	err := jsonparser.ForeachArrayElement(arrayTestJson, func(valueSlice []byte, index int) {
+		results = append(results, string(valueSlice))
+	}, "number_array")
+
+	assert.NoError(t, err)
+	assert.Equal(t, len(expected), len(results), "Should have correct number of elements")
+	for i, exp := range expected {
+		assert.Equal(t, exp, results[i], "Element at index %d should match", i)
+	}
+}
+
+// Test ForeachArrayElement with float array
+func TestForeachArrayElement_FloatArray(t *testing.T) {
+	expected := []string{"1.1", "2.5", "3.14", "4.0", "5.999"}
+	results := []string{}
+
+	err := jsonparser.ForeachArrayElement(arrayTestJson, func(valueSlice []byte, index int) {
+		results = append(results, string(valueSlice))
+	}, "float_array")
+
+	assert.NoError(t, err)
+	assert.Equal(t, len(expected), len(results), "Should have correct number of elements")
+	for i, exp := range expected {
+		assert.Equal(t, exp, results[i], "Element at index %d should match", i)
+	}
+}
+
+// Test ForeachArrayElement with boolean array
+func TestForeachArrayElement_BooleanArray(t *testing.T) {
+	expected := []string{"true", "false", "true", "true", "false"}
+	results := []string{}
+
+	err := jsonparser.ForeachArrayElement(arrayTestJson, func(valueSlice []byte, index int) {
+		results = append(results, string(valueSlice))
+	}, "boolean_array")
+
+	assert.NoError(t, err)
+	assert.Equal(t, len(expected), len(results), "Should have correct number of elements")
+	for i, exp := range expected {
+		assert.Equal(t, exp, results[i], "Element at index %d should match", i)
+	}
+}
+
+// Test ForeachArrayElement with mixed array
+func TestForeachArrayElement_MixedArray(t *testing.T) {
+	expected := []string{"1", "hello", "true", "3.14", "null", "false", "world"}
+	results := []string{}
+
+	err := jsonparser.ForeachArrayElement(arrayTestJson, func(valueSlice []byte, index int) {
+		results = append(results, string(valueSlice))
+	}, "mixed_array")
+
+	assert.NoError(t, err)
+	assert.Equal(t, len(expected), len(results), "Should have correct number of elements")
+	for i, exp := range expected {
+		assert.Equal(t, exp, results[i], "Element at index %d should match", i)
+	}
+}
+
+// Test ForeachArrayElement with empty array
+func TestForeachArrayElement_EmptyArray(t *testing.T) {
+	callCount := 0
+
+	err := jsonparser.ForeachArrayElement(arrayTestJson, func(valueSlice []byte, index int) {
+		callCount++
+	}, "empty_array")
+
+	assert.NoError(t, err)
+	assert.Equal(t, 0, callCount, "Callback should not be called for empty array")
+}
+
+// Test ForeachArrayElement with null array
+func TestForeachArrayElement_NullArray(t *testing.T) {
+	expected := []string{"null", "null", "null"}
+	results := []string{}
+
+	err := jsonparser.ForeachArrayElement(arrayTestJson, func(valueSlice []byte, index int) {
+		results = append(results, string(valueSlice))
+	}, "null_array")
+
+	assert.NoError(t, err)
+	assert.Equal(t, len(expected), len(results), "Should have correct number of elements")
+	for i, exp := range expected {
+		assert.Equal(t, exp, results[i], "Element at index %d should match", i)
+	}
+}
+
+// Test ForeachArrayElement with nested arrays - iterating outer array
+func TestForeachArrayElement_NestedArrays(t *testing.T) {
+	results := []string{}
+
+	err := jsonparser.ForeachArrayElement(arrayTestJson, func(valueSlice []byte, index int) {
+		// Remove whitespace for comparison
+		normalized := string(valueSlice)
+		results = append(results, normalized)
+	}, "nested_arrays")
+
+	assert.NoError(t, err)
+	assert.Equal(t, 4, len(results), "Should have 4 nested arrays")
+	// Verify each result is an array
+	for i, result := range results {
+		assert.True(t, len(result) > 0 && result[0] == '[', "Element at index %d should be an array", i)
+	}
+}
+
+// Test ForeachArrayElement with nested arrays - iterating inner array
+func TestForeachArrayElement_NestedArraysInner(t *testing.T) {
+	expected := []string{"1", "2", "3"}
+	results := []string{}
+
+	err := jsonparser.ForeachArrayElement(arrayTestJson, func(valueSlice []byte, index int) {
+		results = append(results, string(valueSlice))
+	}, "nested_arrays", "0")
+
+	assert.NoError(t, err)
+	assert.Equal(t, len(expected), len(results), "Should have correct number of elements")
+	for i, exp := range expected {
+		assert.Equal(t, exp, results[i], "Element at index %d should match", i)
+	}
+}
+
+// Test ForeachArrayElement with array of objects
+func TestForeachArrayElement_ArrayOfObjects(t *testing.T) {
+	results := []string{}
+	expectedCount := 3
+
+	err := jsonparser.ForeachArrayElement(arrayTestJson, func(valueSlice []byte, index int) {
+		results = append(results, string(valueSlice))
+	}, "array_of_objects")
+
+	assert.NoError(t, err)
+	assert.Equal(t, expectedCount, len(results), "Should have 3 objects")
+
+	// Each result should be a JSON object
+	for i, result := range results {
+		assert.Contains(t, result, "id", "Object at index %d should contain 'id'", i)
+		assert.Contains(t, result, "name", "Object at index %d should contain 'name'", i)
+		assert.Contains(t, result, "email", "Object at index %d should contain 'email'", i)
+	}
+}
+
+// Test ForeachArrayElement with objects containing arrays
+func TestForeachArrayElement_ObjectsWithArrays(t *testing.T) {
+	results := []string{}
+	expectedCount := 2
+
+	err := jsonparser.ForeachArrayElement(arrayTestJson, func(valueSlice []byte, index int) {
+		results = append(results, string(valueSlice))
+	}, "objects_with_arrays")
+
+	assert.NoError(t, err)
+	assert.Equal(t, expectedCount, len(results), "Should have 2 objects")
+}
+
+// Test ForeachArrayElement accessing nested array within object
+func TestForeachArrayElement_NestedArrayInObject(t *testing.T) {
+	expected := []string{"electronics", "mobile", "smartphone"}
+	results := []string{}
+
+	err := jsonparser.ForeachArrayElement(arrayTestJson, func(valueSlice []byte, index int) {
+		results = append(results, string(valueSlice))
+	}, "objects_with_arrays", "0", "tags")
+
+	assert.NoError(t, err)
+	assert.Equal(t, len(expected), len(results), "Should have correct number of tags")
+	for i, exp := range expected {
+		assert.Equal(t, exp, results[i], "Tag at index %d should match", i)
+	}
+}
+
+// Benchmark ForeachArrayElement
+func BenchmarkForeachArrayElement_StringArray(b *testing.B) {
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = jsonparser.ForeachArrayElement(arrayTestJson, func(valueSlice []byte, index int) {
+			// Do minimal work
+			_ = valueSlice
+		}, "string_array")
+	}
+}
+
+func BenchmarkForeachArrayElement_LargeArray(b *testing.B) {
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = jsonparser.ForeachArrayElement(arrayTestJson, func(valueSlice []byte, index int) {
+			// Do minimal work
+			_ = valueSlice
+		}, "large_array")
+	}
+}
+
+func BenchmarkForeachArrayElement_ArrayOfObjects(b *testing.B) {
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = jsonparser.ForeachArrayElement(arrayTestJson, func(valueSlice []byte, index int) {
+			// Do minimal work
+			_ = valueSlice
+		}, "array_of_objects")
 	}
 }

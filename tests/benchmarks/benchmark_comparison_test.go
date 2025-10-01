@@ -143,7 +143,7 @@ func BenchmarkFloat_GetFloat_Mucca(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		_, err := jsonparser.GetFloat64(comparisonJson, 64, "floatPositive")
+		_, err := jsonparser.GetFloat64(comparisonJson, "floatPositive")
 		if err != nil {
 			b.Error(err)
 		}
@@ -289,5 +289,50 @@ func BenchmarkManyFields_GetString_Std(b *testing.B) {
 		perf := result["performance"].(map[string]interface{})
 		manyFields := perf["manyFields"].(map[string]interface{})
 		_ = manyFields["field15"].(string)
+	}
+}
+
+// Benchmark array iteration operations
+func BenchmarkArrayIteration_ForeachArrayElement_Mucca(b *testing.B) {
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		err := jsonparser.ForeachArrayElement(comparisonJson, func(valueSlice []byte, index int) {
+			_ = valueSlice
+		}, "arrayOfStrings")
+		if err != nil {
+			b.Error(err)
+		}
+	}
+}
+
+func BenchmarkArrayIteration_ArrayEach_Buger(b *testing.B) {
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		_, err := buger.ArrayEach(comparisonJson, func(value []byte, dataType buger.ValueType, offset int, err error) {
+			_ = value
+		}, "arrayOfStrings")
+		if err != nil {
+			b.Error(err)
+		}
+	}
+}
+
+func BenchmarkArrayIteration_ArrayEach_Std(b *testing.B) {
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		var result map[string]interface{}
+		if err := json.Unmarshal(comparisonJson, &result); err != nil {
+			b.Error(err)
+		}
+		arr := result["arrayOfStrings"].([]interface{})
+		for _, v := range arr {
+			_ = v.(string)
+		}
 	}
 }

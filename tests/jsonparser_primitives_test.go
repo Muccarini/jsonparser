@@ -130,7 +130,7 @@ func TestGetFloat64_Primitives(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := jsonparser.GetFloat64(primitivesTestJson, tt.bitSize, tt.fields...)
+			result, err := jsonparser.GetFloat64(primitivesTestJson, tt.fields...)
 			assert.NoError(t, err, "Error getting %v", tt.fields)
 			assert.Equal(t, tt.expected, result, "%s should equal %f", tt.fields, tt.expected)
 		})

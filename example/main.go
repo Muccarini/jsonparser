@@ -20,7 +20,7 @@ func main() {
 	name, _ := jsonparser.GetString(json, "name")
 	age, _ := jsonparser.GetInt(json, "age")
 	active, _ := jsonparser.GetBool(json, "active")
-	score, _ := jsonparser.GetFloat64(json, 64, "score")
+	score, _ := jsonparser.GetFloat64(json, "score")
 
 	// Array and nested access
 	tag, _ := jsonparser.GetString(json, "tags", "1")
