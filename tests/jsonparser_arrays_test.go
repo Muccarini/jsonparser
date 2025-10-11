@@ -405,7 +405,7 @@ func TestForeachArrayElement_StringArray(t *testing.T) {
 	expected := []string{"apple", "banana", "cherry", "date"}
 	results := []string{}
 
-	err := jsonparser.ForeachArrayElement(arrayTestJson, func(valueSlice []byte, index int) {
+	err := jsonparser.Foreach(arrayTestJson, func(valueSlice []byte, index int) {
 		results = append(results, string(valueSlice))
 	}, "string_array")
 
@@ -421,7 +421,7 @@ func TestForeachArrayElement_NumberArray(t *testing.T) {
 	expected := []string{"1", "2", "3", "4", "5", "42", "100"}
 	results := []string{}
 
-	err := jsonparser.ForeachArrayElement(arrayTestJson, func(valueSlice []byte, index int) {
+	err := jsonparser.Foreach(arrayTestJson, func(valueSlice []byte, index int) {
 		results = append(results, string(valueSlice))
 	}, "number_array")
 
@@ -437,7 +437,7 @@ func TestForeachArrayElement_FloatArray(t *testing.T) {
 	expected := []string{"1.1", "2.5", "3.14", "4.0", "5.999"}
 	results := []string{}
 
-	err := jsonparser.ForeachArrayElement(arrayTestJson, func(valueSlice []byte, index int) {
+	err := jsonparser.Foreach(arrayTestJson, func(valueSlice []byte, index int) {
 		results = append(results, string(valueSlice))
 	}, "float_array")
 
@@ -453,7 +453,7 @@ func TestForeachArrayElement_BooleanArray(t *testing.T) {
 	expected := []string{"true", "false", "true", "true", "false"}
 	results := []string{}
 
-	err := jsonparser.ForeachArrayElement(arrayTestJson, func(valueSlice []byte, index int) {
+	err := jsonparser.Foreach(arrayTestJson, func(valueSlice []byte, index int) {
 		results = append(results, string(valueSlice))
 	}, "boolean_array")
 
@@ -469,7 +469,7 @@ func TestForeachArrayElement_MixedArray(t *testing.T) {
 	expected := []string{"1", "hello", "true", "3.14", "null", "false", "world"}
 	results := []string{}
 
-	err := jsonparser.ForeachArrayElement(arrayTestJson, func(valueSlice []byte, index int) {
+	err := jsonparser.Foreach(arrayTestJson, func(valueSlice []byte, index int) {
 		results = append(results, string(valueSlice))
 	}, "mixed_array")
 
@@ -484,7 +484,7 @@ func TestForeachArrayElement_MixedArray(t *testing.T) {
 func TestForeachArrayElement_EmptyArray(t *testing.T) {
 	callCount := 0
 
-	err := jsonparser.ForeachArrayElement(arrayTestJson, func(valueSlice []byte, index int) {
+	err := jsonparser.Foreach(arrayTestJson, func(valueSlice []byte, index int) {
 		callCount++
 	}, "empty_array")
 
@@ -497,7 +497,7 @@ func TestForeachArrayElement_NullArray(t *testing.T) {
 	expected := []string{"null", "null", "null"}
 	results := []string{}
 
-	err := jsonparser.ForeachArrayElement(arrayTestJson, func(valueSlice []byte, index int) {
+	err := jsonparser.Foreach(arrayTestJson, func(valueSlice []byte, index int) {
 		results = append(results, string(valueSlice))
 	}, "null_array")
 
@@ -512,7 +512,7 @@ func TestForeachArrayElement_NullArray(t *testing.T) {
 func TestForeachArrayElement_NestedArrays(t *testing.T) {
 	results := []string{}
 
-	err := jsonparser.ForeachArrayElement(arrayTestJson, func(valueSlice []byte, index int) {
+	err := jsonparser.Foreach(arrayTestJson, func(valueSlice []byte, index int) {
 		// Remove whitespace for comparison
 		normalized := string(valueSlice)
 		results = append(results, normalized)
@@ -531,7 +531,7 @@ func TestForeachArrayElement_NestedArraysInner(t *testing.T) {
 	expected := []string{"1", "2", "3"}
 	results := []string{}
 
-	err := jsonparser.ForeachArrayElement(arrayTestJson, func(valueSlice []byte, index int) {
+	err := jsonparser.Foreach(arrayTestJson, func(valueSlice []byte, index int) {
 		results = append(results, string(valueSlice))
 	}, "nested_arrays", "0")
 
@@ -547,7 +547,7 @@ func TestForeachArrayElement_ArrayOfObjects(t *testing.T) {
 	results := []string{}
 	expectedCount := 3
 
-	err := jsonparser.ForeachArrayElement(arrayTestJson, func(valueSlice []byte, index int) {
+	err := jsonparser.Foreach(arrayTestJson, func(valueSlice []byte, index int) {
 		results = append(results, string(valueSlice))
 	}, "array_of_objects")
 
@@ -567,7 +567,7 @@ func TestForeachArrayElement_ObjectsWithArrays(t *testing.T) {
 	results := []string{}
 	expectedCount := 2
 
-	err := jsonparser.ForeachArrayElement(arrayTestJson, func(valueSlice []byte, index int) {
+	err := jsonparser.Foreach(arrayTestJson, func(valueSlice []byte, index int) {
 		results = append(results, string(valueSlice))
 	}, "objects_with_arrays")
 
@@ -580,7 +580,7 @@ func TestForeachArrayElement_NestedArrayInObject(t *testing.T) {
 	expected := []string{"electronics", "mobile", "smartphone"}
 	results := []string{}
 
-	err := jsonparser.ForeachArrayElement(arrayTestJson, func(valueSlice []byte, index int) {
+	err := jsonparser.Foreach(arrayTestJson, func(valueSlice []byte, index int) {
 		results = append(results, string(valueSlice))
 	}, "objects_with_arrays", "0", "tags")
 
@@ -595,7 +595,7 @@ func TestForeachArrayElement_NestedArrayInObject(t *testing.T) {
 func BenchmarkForeachArrayElement_StringArray(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = jsonparser.ForeachArrayElement(arrayTestJson, func(valueSlice []byte, index int) {
+		_ = jsonparser.Foreach(arrayTestJson, func(valueSlice []byte, index int) {
 			// Do minimal work
 			_ = valueSlice
 		}, "string_array")
@@ -605,7 +605,7 @@ func BenchmarkForeachArrayElement_StringArray(b *testing.B) {
 func BenchmarkForeachArrayElement_LargeArray(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = jsonparser.ForeachArrayElement(arrayTestJson, func(valueSlice []byte, index int) {
+		_ = jsonparser.Foreach(arrayTestJson, func(valueSlice []byte, index int) {
 			// Do minimal work
 			_ = valueSlice
 		}, "large_array")
@@ -615,7 +615,7 @@ func BenchmarkForeachArrayElement_LargeArray(b *testing.B) {
 func BenchmarkForeachArrayElement_ArrayOfObjects(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = jsonparser.ForeachArrayElement(arrayTestJson, func(valueSlice []byte, index int) {
+		_ = jsonparser.Foreach(arrayTestJson, func(valueSlice []byte, index int) {
 			// Do minimal work
 			_ = valueSlice
 		}, "array_of_objects")

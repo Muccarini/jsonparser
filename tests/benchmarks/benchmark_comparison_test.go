@@ -33,6 +33,20 @@ func BenchmarkString_GetString_Mucca(b *testing.B) {
 	}
 }
 
+func BenchmarkString_Get_Mucca(b *testing.B) {
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		var result string
+		var err error
+		if _, err = jsonparser.Get(&result, comparisonJson, "stringValue"); err != nil {
+			b.Error(err)
+		}
+
+	}
+}
+
 func BenchmarkString_GetString_Buger(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -66,6 +80,19 @@ func BenchmarkNestedString_GetString_Mucca(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_, err := jsonparser.GetString(comparisonJson, "nested", "level2", "level3", "extremelyDeepString")
 		if err != nil {
+			b.Error(err)
+		}
+	}
+}
+
+func BenchmarkNestedString_Get_Mucca(b *testing.B) {
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		var result string
+		var err error
+		if _, err = jsonparser.Get(&result, comparisonJson, "nested", "level2", "level3", "extremelyDeepString"); err != nil {
 			b.Error(err)
 		}
 	}
@@ -112,6 +139,19 @@ func BenchmarkInt_GetInt_Mucca(b *testing.B) {
 	}
 }
 
+func BenchmarkInt_Get_Mucca(b *testing.B) {
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		var result int64
+		var err error
+		if _, err = jsonparser.Get(&result, comparisonJson, "intPositive"); err != nil {
+			b.Error(err)
+		}
+	}
+}
+
 func BenchmarkInt_GetInt_Buger(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -145,6 +185,19 @@ func BenchmarkFloat_GetFloat_Mucca(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_, err := jsonparser.GetFloat64(comparisonJson, "floatPositive")
 		if err != nil {
+			b.Error(err)
+		}
+	}
+}
+
+func BenchmarkFloat_Get_Mucca(b *testing.B) {
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		var result float64
+		var err error
+		if _, err = jsonparser.Get(&result, comparisonJson, "floatPositive"); err != nil {
 			b.Error(err)
 		}
 	}
@@ -188,6 +241,19 @@ func BenchmarkBool_GetBool_Mucca(b *testing.B) {
 	}
 }
 
+func BenchmarkBoolean_Get_Mucca(b *testing.B) {
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		var result bool
+		var err error
+		if _, err = jsonparser.Get(&result, comparisonJson, "boolTrue"); err != nil {
+			b.Error(err)
+		}
+
+	}
+}
+
 func BenchmarkBool_GetBool_Buger(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -221,6 +287,18 @@ func BenchmarkArrayAccess_GetString_Mucca(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_, err := jsonparser.GetString(comparisonJson, "arrayOfStrings", "2")
 		if err != nil {
+			b.Error(err)
+		}
+	}
+}
+
+func BenchmarkArrayAccess_Get_Mucca(b *testing.B) {
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		var result string
+		var err error
+		if _, err = jsonparser.Get(&result, comparisonJson, "arrayOfStrings", "2"); err != nil {
 			b.Error(err)
 		}
 	}
@@ -265,6 +343,18 @@ func BenchmarkManyFields_GetString_Mucca(b *testing.B) {
 	}
 }
 
+func BenchmarkManyFields_Get_Mucca(b *testing.B) {
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		var result string
+		var err error
+		if _, err = jsonparser.Get(&result, comparisonJson, "performance", "manyFields", "field15"); err != nil {
+			b.Error(err)
+		}
+	}
+}
+
 func BenchmarkManyFields_GetString_Buger(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -298,7 +388,7 @@ func BenchmarkArrayIteration_ForeachArrayElement_Mucca(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		err := jsonparser.ForeachArrayElement(comparisonJson, func(valueSlice []byte, index int) {
+		err := jsonparser.Foreach(comparisonJson, func(valueSlice []byte, index int) {
 			_ = valueSlice
 		}, "arrayOfStrings")
 		if err != nil {

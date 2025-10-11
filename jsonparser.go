@@ -3,7 +3,9 @@ package jsonparser
 import (
 	"bytes"
 	"fmt"
+	"reflect"
 	"strconv"
+	"unsafe"
 )
 
 var (
@@ -27,40 +29,119 @@ type irange struct {
 
 // API
 
-func GetString(json []byte, fields ...string) (string, error) {
+func Get[T any](value *T, json []byte, fields ...string) (*T, error) {
 	if len(json) == 0 {
-		return "", ERROR_INVALID_JSON
+		return nil, ERROR_INVALID_JSON
 	}
 
 	if len(fields) == 0 {
-		return "", ERROR_ARGUMENTS
+		return nil, ERROR_ARGUMENTS
 	}
 
-	pos, err := getValuePos(json, fields...)
+	pos, err := findValuePos(json, fields...)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	res, err := extractValue(json[pos:], 0)
+	valueSlice, err := extractValue(json[pos:], 0)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return string(res), nil
+	valueRes, err := get(value, valueSlice, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	return valueRes, nil
 }
 
-func GetBool(json []byte, fields ...string) (bool, error) {
-	pos, err := getValuePos(json, fields...)
-	if err != nil {
-		return false, err
+func get[T any](value *T, slice []byte, depth int) (*T, error) {
+	// extracting T type
+	// try reflect.TypeOf(*value)
+	// which is faster?
+	valueType := reflect.TypeOf(value).Elem()
+
+	switch valueType.Kind() {
+	case reflect.String:
+		*(*string)(unsafe.Pointer(value)) = string(slice)
+
+	case reflect.Bool:
+		boolean, err := ParseBool(slice)
+		if err != nil {
+			return nil, err
+		}
+		*(*bool)(unsafe.Pointer(value)) = boolean
+
+	case reflect.Int:
+		intVal, err := ParseInt(slice)
+		if err != nil {
+			return nil, err
+		}
+		*(*int)(unsafe.Pointer(value)) = intVal
+
+	case reflect.Int64:
+		int64Val, err := ParseInt64(slice)
+		if err != nil {
+			return nil, err
+		}
+		*(*int64)(unsafe.Pointer(value)) = int64Val
+
+	case reflect.Float64:
+		float64Val, err := ParseFloat64(slice)
+		if err != nil {
+			return nil, err
+		}
+		*(*float64)(unsafe.Pointer(value)) = float64Val
+
+	case reflect.Array:
+		sliceValue := reflect.MakeSlice(valueType, 0, 0)
+
+		Foreach(slice, func(valueSlice []byte, index int) {
+
+			elType := valueType.Elem()
+			elem := reflect.New(elType) //this is stack allocated, and it will be freed at the end of the function
+
+			depth++
+			if _, err := get(&elem, valueSlice, depth); err != nil {
+				return
+			}
+
+			sliceValue = reflect.Append(sliceValue, elem)
+
+		})
+
+		reflect.ValueOf(value).Elem().Set(sliceValue)
+
+	case reflect.Slice:
+		// not implemented yet
+	case reflect.Struct:
+		pos, err := findValuePos(slice) // is this needed?
+		if err != nil {
+			return nil, err
+		}
+		slice = slice[pos:]
+
+		for i := 0; i < valueType.NumField(); i++ {
+			nestedValue := reflect.New(valueType).Elem()
+
+			depth++
+			if _, err := get(&nestedValue, slice, depth); err != nil {
+				return nil, err
+			}
+
+			reflect.ValueOf(value).Elem().Field(i).Set(nestedValue)
+		}
+
+	default:
+		return nil, fmt.Errorf("unsupported field type: %s", valueType.Kind().String())
 	}
 
-	res, err := extractValue(json[pos:], 0)
-	if err != nil {
-		return false, err
-	}
+	return value, nil
+}
 
-	switch string(res) {
+func ParseBool(boolean []byte, fields ...string) (bool, error) {
+	switch string(boolean) {
 	case "true":
 		return true, nil
 	case "false":
@@ -70,18 +151,8 @@ func GetBool(json []byte, fields ...string) (bool, error) {
 	return false, ERROR_INVALID_BOOLEAN
 }
 
-func GetInt(json []byte, fields ...string) (int, error) {
-	pos, err := getValuePos(json, fields...)
-	if err != nil {
-		return -1, err
-	}
-
-	res, err := extractValue(json[pos:], 0)
-	if err != nil {
-		return -1, err
-	}
-
-	resInt, err := strconv.Atoi(string(res))
+func ParseInt(integer []byte) (int, error) {
+	resInt, err := strconv.Atoi(string(integer))
 	if err != nil {
 		return -1, err
 	}
@@ -89,18 +160,8 @@ func GetInt(json []byte, fields ...string) (int, error) {
 	return resInt, nil
 }
 
-func GetInt64(json []byte, fields ...string) (int64, error) {
-	pos, err := getValuePos(json, fields...)
-	if err != nil {
-		return -1, err
-	}
-
-	res, err := extractValue(json[pos:], 0)
-	if err != nil {
-		return -1, err
-	}
-
-	resInt64, err := strconv.ParseInt(string(res), 10, 64)
+func ParseInt64(integer []byte) (int64, error) {
+	resInt64, err := strconv.ParseInt(string(integer), 10, 64)
 	if err != nil {
 		return -1, err
 	}
@@ -108,17 +169,7 @@ func GetInt64(json []byte, fields ...string) (int64, error) {
 	return resInt64, nil
 }
 
-func GetFloat32(json []byte, fields ...string) (float32, error) {
-	pos, err := getValuePos(json, fields...)
-	if err != nil {
-		return -1, err
-	}
-
-	num, err := extractValue(json[pos:], 0)
-	if err != nil {
-		return -1, err
-	}
-
+func ParseFloat32(num []byte) (float32, error) {
 	resFloat, err := strconv.ParseFloat(string(num), 32)
 	if err != nil {
 		return -1, err
@@ -127,18 +178,8 @@ func GetFloat32(json []byte, fields ...string) (float32, error) {
 	return float32(resFloat), nil
 }
 
-func GetFloat64(json []byte, fields ...string) (float64, error) {
-	pos, err := getValuePos(json, fields...)
-	if err != nil {
-		return -1, err
-	}
-
-	num, err := extractValue(json[pos:], 0)
-	if err != nil {
-		return -1, err
-	}
-
-	resFloat, err := strconv.ParseFloat(string(num), 64)
+func ParseFloat64(float []byte) (float64, error) {
+	resFloat, err := strconv.ParseFloat(string(float), 64)
 	if err != nil {
 		return -1, err
 	}
@@ -146,7 +187,7 @@ func GetFloat64(json []byte, fields ...string) (float64, error) {
 	return resFloat, nil
 }
 
-func ForeachArrayElement(json []byte, callback func(valueSlice []byte, index int), fields ...string) error {
+func Foreach(json []byte, callback func(valueSlice []byte, index int), fields ...string) error {
 	if len(json) == 0 {
 		return ERROR_INVALID_JSON
 	}
@@ -155,7 +196,7 @@ func ForeachArrayElement(json []byte, callback func(valueSlice []byte, index int
 		return ERROR_ARGUMENTS
 	}
 
-	valPos, err := getValuePos(json, fields...)
+	valPos, err := findValuePos(json, fields...)
 	if err != nil {
 		return nil
 	}
@@ -218,9 +259,143 @@ func ForeachArrayElement(json []byte, callback func(valueSlice []byte, index int
 	return ERROR_INVALID_ARRAY
 }
 
+func GetString(json []byte, fields ...string) (string, error) {
+	if len(json) == 0 {
+		return "", ERROR_INVALID_JSON
+	}
+
+	if len(fields) == 0 {
+		return "", ERROR_ARGUMENTS
+	}
+
+	pos, err := findValuePos(json, fields...)
+	if err != nil {
+		return "", err
+	}
+
+	valueSlice, err := extractValue(json, pos)
+	if err != nil {
+		return "", err
+	}
+
+	return string(valueSlice), nil
+}
+
+func GetBool(json []byte, fields ...string) (bool, error) {
+	if len(json) == 0 {
+		return false, ERROR_INVALID_JSON
+	}
+
+	if len(fields) == 0 {
+		return false, ERROR_ARGUMENTS
+	}
+
+	pos, err := findValuePos(json, fields...)
+	if err != nil {
+		return false, err
+	}
+
+	valueSlice, err := extractValue(json, pos)
+	if err != nil {
+		return false, err
+	}
+
+	return ParseBool(valueSlice)
+}
+
+func GetInt(json []byte, fields ...string) (int, error) {
+	if len(json) == 0 {
+		return 0, ERROR_INVALID_JSON
+	}
+
+	if len(fields) == 0 {
+		return 0, ERROR_ARGUMENTS
+	}
+
+	pos, err := findValuePos(json, fields...)
+	if err != nil {
+		return 0, err
+	}
+
+	valueSlice, err := extractValue(json, pos)
+	if err != nil {
+		return 0, err
+	}
+
+	return ParseInt(valueSlice)
+}
+
+func GetInt64(json []byte, fields ...string) (int64, error) {
+	if len(json) == 0 {
+		return 0, ERROR_INVALID_JSON
+	}
+
+	if len(fields) == 0 {
+		return 0, ERROR_ARGUMENTS
+	}
+
+	pos, err := findValuePos(json, fields...)
+	if err != nil {
+		return 0, err
+	}
+
+	valueSlice, err := extractValue(json, pos)
+	if err != nil {
+		return 0, err
+	}
+
+	return ParseInt64(valueSlice)
+}
+
+func GetFloat32(json []byte, fields ...string) (float32, error) {
+	if len(json) == 0 {
+		return 0, ERROR_INVALID_JSON
+	}
+
+	if len(fields) == 0 {
+		return 0, ERROR_ARGUMENTS
+	}
+
+	pos, err := findValuePos(json, fields...)
+	if err != nil {
+		return 0, err
+	}
+
+	valueSlice, err := extractValue(json, pos)
+	if err != nil {
+		return 0, err
+	}
+
+	return ParseFloat32(valueSlice)
+}
+
+func GetFloat64(json []byte, fields ...string) (float64, error) {
+	if len(json) == 0 {
+		return 0, ERROR_INVALID_JSON
+	}
+
+	if len(fields) == 0 {
+		return 0, ERROR_ARGUMENTS
+	}
+
+	pos, err := findValuePos(json, fields...)
+	if err != nil {
+		return 0, err
+	}
+
+	valueSlice, err := extractValue(json, pos)
+	if err != nil {
+		return 0, err
+	}
+
+	return ParseFloat64(valueSlice)
+}
+
 // INTERNAL
 
-func getValuePos(json []byte, fields ...string) (int, error) {
+// findValuePos returns the position of the value of the specified field path,
+// no given fields returns the position of the first value in the JSON
+func findValuePos(json []byte, fields ...string) (int, error) {
 	pos := 0
 
 	for _, field := range fields {
@@ -349,7 +524,7 @@ func findArrayValuePos(json []byte, pos int, elementIndex int) (int, error) {
 	return -1, ERROR_FIELD_NOT_FOUND
 }
 
-// findFieldValuePos returns the position of the colon after the field name at the specified depth
+// findFieldValuePos returns the position of the colon after the field in the depth level given by the pos parameter
 func findFieldValuePos(json []byte, pos int, field string) (int, error) {
 	if len(json) == 0 {
 		return -1, ERROR_INVALID_JSON
@@ -490,6 +665,7 @@ func skipMatrix(json []byte, pos int) (int, error) {
 	return -1, ERROR_INVALID_JSON
 }
 
+// extractValue returns the slice of bytes representing the value starting from pos
 func extractValue(json []byte, pos int) ([]byte, error) {
 	for pos < len(json) && isWhitespace(json[pos]) {
 		pos++

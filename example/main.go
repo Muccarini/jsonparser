@@ -22,6 +22,21 @@ func main() {
 	active, _ := jsonparser.GetBool(json, "active")
 	score, _ := jsonparser.GetFloat64(json, "score")
 
+	// Basic extraction using generic parser
+	var nameGen string
+	jsonparser.Get(&nameGen, json, "name")
+
+	var ageGen int
+	jsonparser.Get(&ageGen, json, "age")
+
+	var activeGen bool
+	jsonparser.Get(&activeGen, json, "active")
+
+	var scoreGen float64
+	jsonparser.Get(&scoreGen, json, "score")
+
+	fmt.Printf("Generic - Name: %s, Age: %d, Active: %t, Score: %.1f\n", nameGen, ageGen, activeGen, scoreGen)
+
 	// Array and nested access
 	tag, _ := jsonparser.GetString(json, "tags", "1")
 	city, _ := jsonparser.GetString(json, "profile", "city")
