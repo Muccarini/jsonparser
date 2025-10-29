@@ -697,20 +697,20 @@ func extractValue(json []byte, pos int) ([]byte, error) {
 func extractString(json []byte, pos int) ([]byte, error) {
 	// Skip opening quote
 	if json[pos] != '"' {
-		return nil, ERROR_INVALID_STRING
+		return nil, ERROR_INVALID_JSON
 	}
 	start := pos
 	pos++
 
 	// Find closing quote
 	for pos < len(json) {
-		if json[pos] == '"' && (pos == 0 || json[pos-1] != '\\') {
+		if json[pos] == '"' && json[pos-1] != '\\' {
 			return json[start+1 : pos], nil
 		}
 		pos++
 	}
 
-	return nil, ERROR_INVALID_STRING
+	return nil, ERROR_INVALID_JSON
 }
 
 func extractNumber(json []byte, pos int) ([]byte, error) {
