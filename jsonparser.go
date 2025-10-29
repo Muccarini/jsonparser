@@ -680,70 +680,37 @@ func extractValue(json []byte, pos int) ([]byte, error) {
 
 	switch json[pos] {
 	case 't', 'f':
-		slice, err := extractBoolean(json, pos)
-		if err != nil {
-			return nil, err
-		}
-		return slice, nil
-
+		return extractBoolean(json, pos)
 	case 'n':
-		slice, err := extractNull(json, pos)
-		if err != nil {
-			return nil, err
-		}
-		return slice, nil
-
+		return extractNull(json, pos)
 	case '{':
-		slice, err := extractObject(json, pos)
-		if err != nil {
-			return nil, err
-		}
-		return slice, nil
-
+		return extractObject(json, pos)
 	case '[':
-		slice, err := extractArray(json, pos)
-		if err != nil {
-			return nil, err
-		}
-		return slice, nil
-
+		return extractArray(json, pos)
 	case '"':
-		slice, err := extractString(json, pos)
-		if err != nil {
-			return nil, err
-		}
-		return slice, nil
-
+		return extractString(json, pos)
 	default:
-		slice, err := extractNumber(json, pos)
-		if err != nil {
-			return nil, err
-		}
-		return slice, nil
+		return extractNumber(json, pos)
 	}
 }
 
 func extractString(json []byte, pos int) ([]byte, error) {
 	// Skip opening quote
-	var start int
-	if json[pos] == '"' {
-		start = pos
-		pos++
-	} else {
-		start = pos
+	if json[pos] != '"' {
+		return nil, ERROR_INVALID_STRING
 	}
+	start := pos
+	pos++
 
 	// Find closing quote
 	for pos < len(json) {
-		if json[pos] == '"' {
-			if pos > 0 && json[pos-1] != '\\' {
-				return json[start+1 : pos], nil
-			}
+		if json[pos] == '"' && (pos == 0 || json[pos-1] != '\\') {
+			return json[start+1 : pos], nil
 		}
 		pos++
 	}
 
-	return nil, ERROR_INVALID_JSON
+	return nil, ERROR_INVALID_STRING
 }
 
 func extractNumber(json []byte, pos int) ([]byte, error) {
