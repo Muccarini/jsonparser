@@ -1,7 +1,7 @@
 package jsonparser
 
 import (
-	"bytes"
+	"errors"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -9,22 +9,28 @@ import (
 )
 
 var (
-	ERROR_INVALID_JSON       = fmt.Errorf("invalid JSON")
-	ERROR_FIELD_NOT_FOUND    = fmt.Errorf("field not found")
-	ERROR_ARGUMENTS          = fmt.Errorf("invalid arguments")
-	ERROR_COLON_NOT_FOUND    = fmt.Errorf("no colon found")
-	ERROR_INVALID_INTEGER    = fmt.Errorf("invalid integer")
-	ERROR_INVALID_FLOAT      = fmt.Errorf("invalid float")
-	ERROR_INVALID_BOOLEAN    = fmt.Errorf("invalid boolean")
-	ERROR_INVALID_STRING     = fmt.Errorf("invalid string")
-	ERROR_INVALID_NULL       = fmt.Errorf("invalid null")
-	ERROR_INVALID_ARRAY      = fmt.Errorf("invalid array")
-	ERROR_UNTERMINATED_ARRAY = fmt.Errorf("unterminated array")
+	ERROR_INVALID_JSON       = errors.New("invalid JSON")
+	ERROR_FIELD_NOT_FOUND    = errors.New("field not found")
+	ERROR_ARGUMENTS          = errors.New("invalid arguments")
+	ERROR_COLON_NOT_FOUND    = errors.New("no colon found")
+	ERROR_INVALID_INTEGER    = errors.New("invalid integer")
+	ERROR_INVALID_FLOAT      = errors.New("invalid float")
+	ERROR_INVALID_BOOLEAN    = errors.New("invalid boolean")
+	ERROR_INVALID_STRING     = errors.New("invalid string")
+	ERROR_INVALID_NULL       = errors.New("invalid null")
+	ERROR_INVALID_ARRAY      = errors.New("invalid array")
+	ERROR_UNTERMINATED_ARRAY = errors.New("unterminated array")
 )
 
 type irange struct {
 	start int
 	end   int
+}
+
+// unsafeString converts byte slice to string without allocation
+// This is safe for read-only operations where the byte slice won't be modified
+func unsafeString(b []byte) string {
+	return unsafe.String(unsafe.SliceData(b), len(b))
 }
 
 // API
@@ -141,10 +147,10 @@ func get[T any](value *T, slice []byte, depth int) (*T, error) {
 }
 
 func ParseBool(boolean []byte, fields ...string) (bool, error) {
-	switch string(boolean) {
-	case "true":
+	if len(boolean) == 4 && boolean[0] == 't' && boolean[1] == 'r' && boolean[2] == 'u' && boolean[3] == 'e' {
 		return true, nil
-	case "false":
+	}
+	if len(boolean) == 5 && boolean[0] == 'f' && boolean[1] == 'a' && boolean[2] == 'l' && boolean[3] == 's' && boolean[4] == 'e' {
 		return false, nil
 	}
 
@@ -152,16 +158,16 @@ func ParseBool(boolean []byte, fields ...string) (bool, error) {
 }
 
 func ParseInt(integer []byte) (int, error) {
-	resInt, err := strconv.Atoi(string(integer))
+	resInt64, err := strconv.ParseInt(unsafeString(integer), 10, 0)
 	if err != nil {
 		return -1, err
 	}
 
-	return resInt, nil
+	return int(resInt64), nil
 }
 
 func ParseInt64(integer []byte) (int64, error) {
-	resInt64, err := strconv.ParseInt(string(integer), 10, 64)
+	resInt64, err := strconv.ParseInt(unsafeString(integer), 10, 64)
 	if err != nil {
 		return -1, err
 	}
@@ -170,7 +176,7 @@ func ParseInt64(integer []byte) (int64, error) {
 }
 
 func ParseFloat32(num []byte) (float32, error) {
-	resFloat, err := strconv.ParseFloat(string(num), 32)
+	resFloat, err := strconv.ParseFloat(unsafeString(num), 32)
 	if err != nil {
 		return -1, err
 	}
@@ -179,7 +185,7 @@ func ParseFloat32(num []byte) (float32, error) {
 }
 
 func ParseFloat64(float []byte) (float64, error) {
-	resFloat, err := strconv.ParseFloat(string(float), 64)
+	resFloat, err := strconv.ParseFloat(unsafeString(float), 64)
 	if err != nil {
 		return -1, err
 	}
@@ -438,7 +444,8 @@ func isNumericField(s string) bool {
 		return false
 	}
 
-	for _, c := range []byte(s) {
+	for i := 0; i < len(s); i++ {
+		c := s[i]
 		if c < '0' || c > '9' {
 			return false
 		}
@@ -552,8 +559,8 @@ func findFieldValuePos(json []byte, pos int, field string) (int, error) {
 
 				candidate := irange{start: pos + 1, end: pos + 1 + len(field)}
 
-				if json[candidate.end] == '"' &&
-					bytes.Equal(json[candidate.start:candidate.end], []byte(field)) {
+				if candidate.end < len(json) && json[candidate.end] == '"' &&
+					unsafeString(json[candidate.start:candidate.end]) == field {
 
 					pos, err := nextColon(json, candidate.end)
 					if err != nil {
@@ -620,11 +627,11 @@ func skipObject(json []byte, pos int) (int, error) {
 	for pos < len(json) {
 		switch json[pos] {
 		case '{':
-			if json[pos-1] != '\\' {
+			if pos == 0 || json[pos-1] != '\\' {
 				depth++
 			}
 		case '}':
-			if json[pos-1] != '\\' {
+			if pos == 0 || json[pos-1] != '\\' {
 				depth--
 				if depth == 0 {
 					return pos + 1, nil
@@ -648,11 +655,11 @@ func skipMatrix(json []byte, pos int) (int, error) {
 	for pos < len(json) {
 		switch json[pos] {
 		case '[':
-			if json[pos-1] != '\\' {
+			if pos == 0 || json[pos-1] != '\\' {
 				count++
 			}
 		case ']':
-			if json[pos-1] != '\\' {
+			if pos == 0 || json[pos-1] != '\\' {
 				count--
 				if count == 0 {
 					return pos + 1, nil
@@ -756,17 +763,17 @@ func extractNumber(json []byte, pos int) ([]byte, error) {
 }
 
 func extractBoolean(json []byte, pos int) ([]byte, error) {
-	if pos+4 <= len(json) && bytes.Equal(json[pos:pos+4], []byte("true")) {
+	if pos+4 <= len(json) && json[pos] == 't' && json[pos+1] == 'r' && json[pos+2] == 'u' && json[pos+3] == 'e' {
 		return json[pos : pos+4], nil
 	}
-	if pos+5 <= len(json) && bytes.Equal(json[pos:pos+5], []byte("false")) {
+	if pos+5 <= len(json) && json[pos] == 'f' && json[pos+1] == 'a' && json[pos+2] == 'l' && json[pos+3] == 's' && json[pos+4] == 'e' {
 		return json[pos : pos+5], nil
 	}
 	return nil, ERROR_INVALID_BOOLEAN
 }
 
 func extractNull(json []byte, pos int) ([]byte, error) {
-	if pos+4 <= len(json) && bytes.Equal(json[pos:pos+4], []byte("null")) {
+	if pos+4 <= len(json) && json[pos] == 'n' && json[pos+1] == 'u' && json[pos+2] == 'l' && json[pos+3] == 'l' {
 		return json[pos : pos+4], nil
 	}
 	return nil, ERROR_INVALID_NULL
